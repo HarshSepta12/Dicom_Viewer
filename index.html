@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>DICOM Viewer - Fixed (Cornerstone)</title>
+  <title>DICOM Viewer — Series & Folder Upload</title>
 
   <!-- Libraries -->
   <script src="https://unpkg.com/dicom-parser@1.8.6/dist/dicomParser.min.js"></script>
@@ -12,7 +12,7 @@
   <script src="https://unpkg.com/cornerstone-wado-image-loader@3.0.2/dist/cornerstoneWADOImageLoader.min.js"></script>
   <script src="https://unpkg.com/cornerstone-tools@4.21.0/dist/cornerstoneTools.min.js"></script>
 
-  <!-- <<< Patch: ensure globalConfiguration exists right after cornerstoneTools loads >>> -->
+  <!-- Ensure cornerstoneTools globalConfiguration exists -->
   <script>
     (function ensureCornerstoneToolsConfig() {
       if (window.cornerstoneTools) {
@@ -21,9 +21,9 @@
         if (typeof window.cornerstoneTools.globalConfiguration.configuration.globalToolSyncEnabled === 'undefined') {
           window.cornerstoneTools.globalConfiguration.configuration.globalToolSyncEnabled = false;
         }
-        console.log('ensureCornerstoneToolsConfig: patched globalConfiguration');
+        console.log('cornerstoneTools globalConfiguration patched');
       } else {
-        console.warn('ensureCornerstoneToolsConfig: cornerstoneTools not loaded yet');
+        console.warn('cornerstoneTools not loaded yet');
       }
     })();
   </script>
@@ -32,39 +32,46 @@
     *{box-sizing:border-box;margin:0;padding:0}
     body{font-family:system-ui,Segoe UI,Roboto; background:#1e1e1e;color:#fff;height:100vh;overflow:hidden}
     .app-container{display:flex;flex-direction:column;height:100vh}
-    .header{background:#2d2d2d;border-bottom:1px solid #404040;padding:12px 24px;display:flex;align-items:center;justify-content:space-between}
-    .logo{font-size:20px;color:#5ACCE6;font-weight:700}
-    .header-controls{display:flex;gap:10px}
-    .btn{background:#404040;border:1px solid #555;color:#fff;padding:8px 12px;border-radius:4px;cursor:pointer}
+    .header{background:#2d2d2d;border-bottom:1px solid #404040;padding:12px 16px;display:flex;align-items:center;justify-content:space-between}
+    .logo{font-size:18px;color:#5ACCE6;font-weight:700}
+    .header-controls{display:flex;gap:8px}
+    .btn{background:#404040;border:1px solid #555;color:#fff;padding:8px 10px;border-radius:4px;cursor:pointer}
     .btn.primary{background:#5ACCE6;color:#000;border-color:#5ACCE6}
     .main-layout{display:flex;flex:1;overflow:hidden}
-    .sidebar{width:280px;background:#252525;border-right:1px solid #404040;display:flex;flex-direction:column}
-    .sidebar-section{padding:16px;border-bottom:1px solid #404040}
+    .sidebar{width:320px;background:#252525;border-right:1px solid #404040;display:flex;flex-direction:column}
+    .sidebar-section{padding:12px;border-bottom:1px solid #404040;overflow:auto}
+    .sidebar-title{font-weight:600;color:#ccc;margin-bottom:8px}
+    .series-list{max-height:420px;overflow:auto}
+    .series-item{background:#2d2d2d;border:1px solid #404040;border-radius:6px;padding:10px;margin-bottom:8px;cursor:pointer}
+    .series-item.active{background:rgba(90,204,230,0.08);border-color:#5ACCE6}
     .viewer-area{flex:1;display:flex;flex-direction:column;position:relative;background:#000}
     .toolbar{background:#2d2d2d;border-bottom:1px solid #404040;padding:8px 12px;display:flex;gap:8px;align-items:center}
-    .tool-btn{background:transparent;border:1px solid #555;color:#ccc;padding:8px 10px;border-radius:4px;cursor:pointer}
+    .tool-btn{background:transparent;border:1px solid #555;color:#ccc;padding:7px 10px;border-radius:4px;cursor:pointer}
     .tool-btn.active{background:#5ACCE6;color:#000;border-color:#5ACCE6}
-    #dicomElement{width:100%;height:100%;background:#000;outline:none}
+    #dicomElement{width:100%;height:100%;background:#000;outline:none;display:block}
     .viewport-overlay{position:absolute;top:12px;left:12px;background:rgba(0,0,0,0.7);padding:8px;border-radius:6px;font-family:monospace;z-index:10;pointer-events:none}
     .ww-wl-controls{position:absolute;top:12px;right:12px;background:rgba(0,0,0,0.7);padding:8px;border-radius:6px;font-family:monospace;z-index:10}
-    .slice-navigation{position:absolute;bottom:20px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,0.7);padding:10px;border-radius:20px;z-index:10;display:flex;gap:8px;align-items:center}
-    .slice-slider{width:200px}
+    .slice-navigation{position:absolute;bottom:18px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,0.7);padding:10px;border-radius:20px;z-index:10;display:flex;gap:8px;align-items:center}
+    .slice-slider{width:220px}
     .upload-overlay{position:absolute;inset:0;background:rgba(0,0,0,0.9);display:flex;align-items:center;justify-content:center;z-index:1000}
-    .upload-area{border:2px dashed #5ACCE6;padding:40px;border-radius:12px;text-align:center;background:rgba(90,204,230,0.03);cursor:pointer}
+    .upload-area{border:2px dashed #5ACCE6;padding:28px;border-radius:12px;text-align:center;background:rgba(90,204,230,0.03);cursor:pointer}
     .hidden{display:none!important}
     .loading{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);z-index:1200;text-align:center}
     .spinner{width:36px;height:36px;border:3px solid rgba(90,204,230,0.3);border-top:3px solid #5ACCE6;border-radius:50%;animation:spin 1s linear infinite;margin:0 auto 8px}
     @keyframes spin{to{transform:rotate(360deg)}}
+    .small-muted{color:#999;font-size:12px}
+    .file-inputs{display:flex;flex-direction:column;gap:8px;margin-top:12px;align-items:center}
+    input[type=file] { color: transparent; } /* hide filename text inside the dashed box */
   </style>
 </head>
 <body>
   <div class="app-container">
     <div class="header">
-      <div class="logo">📋 OHIF Viewer</div>
+      <div class="logo">📋 OHIF-like Viewer (folder & series)</div>
       <div class="header-controls">
         <button class="btn" onclick="resetViewport()">🔄 Reset</button>
         <button class="btn" onclick="fitToWindow()">📐 Fit</button>
-        <button class="btn primary" onclick="document.getElementById('fileInput').click()">📁 Load DICOM</button>
+        <button class="btn primary" onclick="document.getElementById('fileInput').click()">📁 Load DICOM Files</button>
       </div>
     </div>
 
@@ -72,11 +79,12 @@
       <div class="sidebar">
         <div class="sidebar-section">
           <div class="sidebar-title">Studies</div>
-          <div id="studiesList"><div style="color:#666;padding:20px;text-align:center">No studies loaded</div></div>
+          <div id="studiesList"><div class="small-muted">No studies loaded</div></div>
         </div>
+
         <div class="sidebar-section">
           <div class="sidebar-title">Series</div>
-          <div id="seriesList" class="series-list"><div style="color:#666;padding:20px;text-align:center">No series available</div></div>
+          <div id="seriesList" class="series-list"><div class="small-muted">No series available</div></div>
         </div>
       </div>
 
@@ -96,7 +104,7 @@
           </div>
         </div>
 
-        <div class="viewport-container" style="flex:1;position:relative">
+        <div style="flex:1;position:relative;display:flex;flex-direction:column">
           <div id="dicomElement" tabindex="0"></div>
 
           <div class="viewport-overlay">
@@ -129,23 +137,33 @@
     <div class="upload-overlay" id="uploadOverlay">
       <div class="upload-area" id="uploadArea">
         <div style="font-size:40px">📁</div>
-        <div style="font-size:18px;margin-top:6px">Drop DICOM files here</div>
-        <div style="color:#999;margin-top:6px">or click to select files (.dcm, .dicom)</div>
-        <input type="file" id="fileInput" accept=".dcm,.dicom" multiple style="margin-top:12px">
+        <div style="font-size:16px;margin-top:6px">Drop DICOM files here</div>
+        <div style="color:#999;margin-top:6px">or choose files / folder</div>
+
+        <div class="file-inputs">
+          <!-- Standard multiple file input -->
+          <input type="file" id="fileInput" accept=".dcm,.dicom" multiple>
+          <!-- Directory picker (webkitdirectory) to allow folder selection in Chrome/Edge -->
+          <label class="small-muted">(Optional) Select folder: <input type="file" id="folderInput" webkitdirectory directory multiple style="display:inline-block;margin-left:8px"></label>
+          <div class="small-muted">Tip: press the Load DICOM Files button or drop files/folder here</div>
+        </div>
       </div>
     </div>
   </div>
 
   <script>
   // ---------------------
-  // State
+  // State & structures for series grouping
   // ---------------------
   const element = document.getElementById('dicomElement');
-  let currentSeries = []; // array of image objects
+  let studies = {}; // studyUID => { studyUID, studyDate, patientName, series: { seriesUID => { seriesUID, seriesDesc, images: [ {file, imageId, instance} ], loadedImages: [cornerstoneImageObjects] } } }
+  let currentStudyUID = null;
+  let currentSeriesUID = null;
+  let currentSeriesImages = []; // currently displayed series images (cornerstone image objects)
   let currentSliceIndex = 0;
 
   // ---------------------
-  // Helpers: patch again if needed
+  // Helpers: ensure config
   // ---------------------
   function ensureGlobalConfig() {
     if (typeof cornerstoneTools !== 'undefined') {
@@ -184,24 +202,16 @@
         showSVGCursors: true
       });
 
-      // Add tools
+      // Add core tools
       const { WwwcTool, ZoomTool, PanTool, StackScrollMouseWheelTool, ZoomMouseWheelTool } = cornerstoneTools;
       try { if (WwwcTool) cornerstoneTools.addTool(WwwcTool); } catch(e){console.warn(e)}
       try { if (ZoomTool) cornerstoneTools.addTool(ZoomTool); } catch(e){console.warn(e)}
       try { if (PanTool) cornerstoneTools.addTool(PanTool); } catch(e){console.warn(e)}
       try { if (StackScrollMouseWheelTool) cornerstoneTools.addTool(StackScrollMouseWheelTool); } catch(e){console.warn(e)}
-      try {
-        if (ZoomMouseWheelTool) {
-          cornerstoneTools.addTool(ZoomMouseWheelTool, { configuration: { invert:false, preventZoomOutsideImage:false }});
-        }
-      } catch(e){console.warn(e)}
+      try { if (ZoomMouseWheelTool) cornerstoneTools.addTool(ZoomMouseWheelTool, { configuration:{invert:false, preventZoomOutsideImage:false} }); } catch(e){}
 
-      // Default active = WWWC (left drag)
       safeSetActiveTool('Wwwc');
-
-      // Default wheel: zoom-wheel for single slice (will be adjusted after load)
       try { cornerstoneTools.setToolActive('ZoomMouseWheel', {}); } catch(e){}
-
       setupEventListeners();
     } catch (err) {
       console.error('initializeCornerstone error', err);
@@ -221,11 +231,8 @@
 
   function safeSetWheelToolForSeries() {
     try {
-      if (currentSeries.length > 1) {
-        cornerstoneTools.setToolActive('StackScrollMouseWheel', {});
-      } else {
-        cornerstoneTools.setToolActive('ZoomMouseWheel', {});
-      }
+      if (currentSeriesImages.length > 1) cornerstoneTools.setToolActive('StackScrollMouseWheel', {});
+      else cornerstoneTools.setToolActive('ZoomMouseWheel', {});
     } catch(e) {}
   }
 
@@ -233,24 +240,42 @@
     document.querySelectorAll('.tool-btn').forEach(b => b.classList.remove('active'));
     const id = activeTool ? activeTool.toLowerCase() + 'Tool' : null;
     if (id) {
-      const el = document.getElementById(id);
-      if (el) el.classList.add('active');
+      const elBtn = document.getElementById(id);
+      if (elBtn) elBtn.classList.add('active');
     }
   }
 
   // ---------------------
-  // Event listeners & UI wiring
+  // Event listeners & file input wiring
   // ---------------------
   function setupEventListeners() {
     const fileInput = document.getElementById('fileInput');
+    const folderInput = document.getElementById('folderInput');
     const uploadArea = document.getElementById('uploadArea');
     const sliceSlider = document.getElementById('sliceSlider');
 
-    fileInput.addEventListener('change', handleFileSelect);
-    uploadArea.addEventListener('click', () => fileInput.click());
-    uploadArea.addEventListener('dragover', (e)=>{ e.preventDefault(); uploadArea.classList.add('dragover'); });
-    uploadArea.addEventListener('dragleave', (e)=>{ uploadArea.classList.remove('dragover'); });
-    uploadArea.addEventListener('drop', (e)=>{ e.preventDefault(); uploadArea.classList.remove('dragover'); const files = Array.from(e.dataTransfer.files||[]); if(files.length) loadDicomFiles(files); });
+    // Normal files selection
+    fileInput.addEventListener('change', (e) => {
+      const files = Array.from(e.target.files || []);
+      if (files.length) ingestFiles(files);
+      e.target.value = '';
+    });
+
+    // Folder selection (webkitdirectory)
+    folderInput.addEventListener('change', (e) => {
+      const files = Array.from(e.target.files || []);
+      if (files.length) ingestFiles(files);
+      e.target.value = '';
+    });
+
+    // Drag & drop
+    uploadArea.addEventListener('dragover', (e) => { e.preventDefault(); uploadArea.classList.add('dragover'); });
+    uploadArea.addEventListener('dragleave', (e) => { uploadArea.classList.remove('dragover'); });
+    uploadArea.addEventListener('drop', (e) => {
+      e.preventDefault(); uploadArea.classList.remove('dragover');
+      const files = Array.from(e.dataTransfer.files || []);
+      if (files.length) ingestFiles(files);
+    });
 
     sliceSlider.addEventListener('input', (e) => displaySlice(parseInt(e.target.value,10)));
 
@@ -258,104 +283,235 @@
     element.addEventListener('cornerstonenewimage', onNewImage);
 
     document.addEventListener('keydown', (e) => {
-      if (!currentSeries.length) return;
+      if (!currentSeriesImages.length) return;
       if (e.key === 'ArrowRight' || e.key === 'ArrowUp') { e.preventDefault(); nextSlice(); }
       if (e.key === 'ArrowLeft' || e.key === 'ArrowDown') { e.preventDefault(); previousSlice(); }
     });
   }
 
   // ---------------------
-  // Load / display functions
+  // Ingest files: parse DICOM metadata, group by Study/Series
   // ---------------------
-  function loadDicomFiles(files) {
+  async function ingestFiles(fileList) {
     showLoading(true);
+    // make sure the upload overlay is hidden after starting
     document.getElementById('uploadOverlay').classList.add('hidden');
 
-    const dicomFiles = Array.from(files).filter(f => /\.(dcm|dicom)$/i.test(f.name));
-    if (!dicomFiles.length) {
-      showLoading(false);
-      alert('Please select .dcm or .dicom files');
-      document.getElementById('uploadOverlay').classList.remove('hidden');
+    // For each file, create imageId first (file manager) so we can refer to it
+    const fileInfos = fileList.map(file => {
+      try {
+        const imageId = cornerstoneWADOImageLoader.wadouri.fileManager.add(file);
+        return { file, imageId };
+      } catch (e) {
+        console.warn('fileManager.add failed', e);
+        return { file, imageId: null };
+      }
+    });
+
+    // Read and parse DICOM header for each file
+    const readPromises = fileInfos.map(fi => new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onload = function(ev) {
+        try {
+          const arrBuf = ev.target.result;
+          const byteArray = new Uint8Array(arrBuf);
+          const dataSet = dicomParser.parseDicom(byteArray);
+          const studyUID = dataSet.string('x0020000d') || 'no-study-uid';
+          const seriesUID = dataSet.string('x0020000e') || 'no-series-uid';
+          const instanceNumberRaw = dataSet.string('x00200013') || dataSet.string('x00201041') || '0';
+          const instanceNumber = parseFloat(instanceNumberRaw) || 0;
+          const seriesDesc = dataSet.string('x0008103e') || 'Series';
+          const patientName = dataSet.string('x00100010') || 'Unknown';
+          const studyDate = dataSet.string('x00080020') || dataSet.string('x00080023') || 'Unknown';
+
+          resolve(Object.assign({}, fi, { studyUID, seriesUID, instanceNumber, seriesDesc, patientName, studyDate }));
+        } catch (err) {
+          console.warn('parseDicom failed for', fi.file.name, err);
+          resolve(Object.assign({}, fi, { studyUID: 'no-study-uid', seriesUID: 'no-series-uid', instanceNumber: 0, seriesDesc: 'Series', patientName:'Unknown', studyDate:'Unknown' }));
+        }
+      };
+      reader.onerror = function() {
+        resolve(Object.assign({}, fi, { studyUID: 'no-study-uid', seriesUID: 'no-series-uid', instanceNumber: 0, seriesDesc: 'Series', patientName:'Unknown', studyDate:'Unknown' }));
+      };
+      reader.readAsArrayBuffer(fi.file);
+    }));
+
+    const infos = await Promise.all(readPromises);
+
+    // Group into studies -> series
+    infos.forEach(info => {
+      const sUID = info.studyUID;
+      const seUID = info.seriesUID;
+      if (!studies[sUID]) {
+        studies[sUID] = { studyUID: sUID, studyDate: info.studyDate, patientName: info.patientName, series: {} };
+      }
+      if (!studies[sUID].series[seUID]) {
+        studies[sUID].series[seUID] = { seriesUID: seUID, seriesDesc: info.seriesDesc || 'Series', images: [] };
+      }
+      // push file + imageId + instance for sorting later
+      studies[sUID].series[seUID].images.push({ file: info.file, imageId: info.imageId, instance: info.instanceNumber, fileName: info.file.name });
+    });
+
+    // After grouping, update UI lists
+    renderStudiesAndSeries();
+
+    // If first study/series available, auto-select and load first series
+    const studyUIDs = Object.keys(studies);
+    if (studyUIDs.length) {
+      currentStudyUID = studyUIDs[0];
+      const seriesUIDs = Object.keys(studies[currentStudyUID].series);
+      if (seriesUIDs.length) {
+        selectSeries(currentStudyUID, seriesUIDs[0]);
+      }
+    }
+
+    showLoading(false);
+  }
+
+  // ---------------------
+  // UI rendering: Studies and Series list
+  // ---------------------
+  function renderStudiesAndSeries() {
+    const studiesListEl = document.getElementById('studiesList');
+    const seriesListEl = document.getElementById('seriesList');
+
+    // Studies listing (simple)
+    const studyKeys = Object.keys(studies);
+    if (!studyKeys.length) {
+      studiesListEl.innerHTML = '<div class="small-muted">No studies loaded</div>';
+      seriesListEl.innerHTML = '<div class="small-muted">No series available</div>';
       return;
     }
 
-    const promises = dicomFiles.map(file => {
-      const imageId = cornerstoneWADOImageLoader.wadouri.fileManager.add(file);
-      return cornerstone.loadImage(imageId).then(img => ({ imageId, image: img, file }));
+    let sHtml = '';
+    studyKeys.forEach(suid => {
+      const st = studies[suid];
+      sHtml += `<div style="padding:8px;border:1px solid #3a3a3a;border-radius:6px;margin-bottom:8px;cursor:pointer" onclick="onStudyClick('${suid}')">
+        <div style="font-weight:600">${st.patientName}</div>
+        <div class="small-muted">${st.studyDate || ''}</div>
+        <div class="small-muted" style="margin-top:4px">Series: ${Object.keys(st.series).length}</div>
+      </div>`;
     });
+    studiesListEl.innerHTML = sHtml;
 
-    Promise.all(promises).then(results => {
-      // sort by InstanceNumber (0020,0013) then fallback to SliceLocation
-      results.sort((a,b) => {
-        try {
-          const ai = parseFloat(a.image.data.string('x00200013') || '0');
-          const bi = parseFloat(b.image.data.string('x00200013') || '0');
-          if (!isNaN(ai) && !isNaN(bi)) return ai - bi;
-        } catch(e){}
-        try {
-          const al = parseFloat(a.image.data.string('x00201041') || '0');
-          const bl = parseFloat(b.image.data.string('x00201041') || '0');
-          if (!isNaN(al) && !isNaN(bl)) return al - bl;
-        } catch(e){}
-        return 0;
-      });
-
-      currentSeries = results.map(r => r.image);
-      currentSliceIndex = 0;
-
-      updateStudiesList(currentSeries[0]);
-      updateSeriesList(results);
-      setupSliceNavigation();
-      displaySlice(0);
-
-      safeSetWheelToolForSeries();
-      showLoading(false);
-    }).catch(err => {
-      showLoading(false);
-      console.error('load error', err);
-      alert('Error loading files: ' + (err.message || err));
-    });
+    // Series listing for currentStudyUID (if set)
+    if (!currentStudyUID) {
+      // pick first
+      currentStudyUID = studyKeys[0];
+    }
+    renderSeriesForStudy(currentStudyUID);
   }
 
+  function onStudyClick(studyUID) {
+    currentStudyUID = studyUID;
+    renderSeriesForStudy(studyUID);
+  }
+
+  function renderSeriesForStudy(studyUID) {
+    const seriesListEl = document.getElementById('seriesList');
+    const st = studies[studyUID];
+    if (!st) {
+      seriesListEl.innerHTML = '<div class="small-muted">No series</div>';
+      return;
+    }
+    const seriesKeys = Object.keys(st.series);
+    if (!seriesKeys.length) {
+      seriesListEl.innerHTML = '<div class="small-muted">No series</div>';
+      return;
+    }
+    let html = '';
+    seriesKeys.forEach((seUID, idx) => {
+      const se = st.series[seUID];
+      const activeClass = (seUID === currentSeriesUID) ? 'active' : '';
+      html += `<div class="series-item ${activeClass}" onclick="selectSeries('${studyUID}','${seUID}')">
+        <div style="font-weight:600">${se.seriesDesc || 'Series'}</div>
+        <div class="small-muted" style="margin-top:6px">${se.images.length} images</div>
+        <div class="small-muted" style="margin-top:6px">${seUID}</div>
+      </div>`;
+    });
+    seriesListEl.innerHTML = html;
+  }
+
+  // ---------------------
+  // Select & load a series (load images into cornerstone)
+  // ---------------------
+  async function selectSeries(studyUID, seriesUID) {
+    if (!studies[studyUID] || !studies[studyUID].series[seriesUID]) return;
+    currentStudyUID = studyUID;
+    currentSeriesUID = seriesUID;
+
+    // update UI selection highlight
+    renderSeriesForStudy(studyUID);
+
+    // get images array (has imageId and file)
+    const seriesObj = studies[studyUID].series[seriesUID];
+    // sort by instance number
+    seriesObj.images.sort((a,b) => (a.instance || 0) - (b.instance || 0));
+
+    // Load all images for this series (cornerstone.loadImage using stored imageId)
+    showLoading(true);
+    try {
+      const loadPromises = seriesObj.images.map(imgInfo => {
+        if (!imgInfo.imageId) {
+          // if for some reason imageId missing, add the file now
+          try {
+            imgInfo.imageId = cornerstoneWADOImageLoader.wadouri.fileManager.add(imgInfo.file);
+          } catch (e) {}
+        }
+        return cornerstone.loadImage(imgInfo.imageId);
+      });
+
+      const images = await Promise.all(loadPromises);
+      // store loaded images for navigation
+      currentSeriesImages = images;
+      currentSliceIndex = 0;
+
+      // UI updates (study/series info)
+      const sample = images[0];
+      document.getElementById('patientName').textContent = (sample.data && sample.data.string('x00100010')) || studies[studyUID].patientName || 'Unknown';
+      document.getElementById('studyDate').textContent = (sample.data && sample.data.string('x00080020')) || studies[studyUID].studyDate || 'Unknown';
+      document.getElementById('seriesDescription').textContent = sample.data?.string('x0008103e') || seriesObj.seriesDesc || 'Series';
+
+      // show first image
+      displaySlice(0);
+
+      // show/hide slider
+      setupSliceNavigation();
+
+      // set wheel tool appropriately
+      safeSetWheelToolForSeries();
+    } catch (err) {
+      console.error('Error loading series images', err);
+      alert('Error loading series images: ' + (err.message || err));
+    } finally {
+      showLoading(false);
+    }
+  }
+
+  // ---------------------
+  // Display slice & slice navigation
+  // ---------------------
   function displaySlice(index) {
-    if (!currentSeries.length || index < 0 || index >= currentSeries.length) return;
+    if (!currentSeriesImages.length || index < 0 || index >= currentSeriesImages.length) return;
     currentSliceIndex = index;
-    const image = currentSeries[index];
+    const image = currentSeriesImages[index];
     cornerstone.displayImage(element, image);
-    // UI updates
     document.getElementById('currentSlice').textContent = index + 1;
     document.getElementById('sliceSlider').value = index;
     updatePatientInfo(image);
     element.focus();
   }
 
-  // ---------------------
-  // UI update helpers
-  // ---------------------
-  function updateStudiesList(img) {
-    const studiesList = document.getElementById('studiesList');
-    const patientName = img.data?.string('x00100010') || 'Unknown';
-    const studyDate = img.data?.string('x00080020') || 'Unknown';
-    const studyDesc = img.data?.string('x00081030') || 'Study';
-    studiesList.innerHTML = `<div style="padding:8px"><strong>${patientName}</strong><div style="color:#999">${studyDate}</div><div style="color:#999">${studyDesc}</div></div>`;
-  }
-
-  function updateSeriesList(results) {
-    const seriesList = document.getElementById('seriesList');
-    const seriesDesc = results[0].image.data?.string('x0008103e') || 'Series';
-    const seriesNumber = results[0].image.data?.string('x00200011') || '1';
-    seriesList.innerHTML = `<div class="series-item active" onclick="loadSeries(0)"><div style="font-weight:600">Series ${seriesNumber}</div><div style="color:#999">${seriesDesc}</div><div style="color:#666">${results.length} images</div></div>`;
-  }
-
   function setupSliceNavigation() {
     const nav = document.getElementById('sliceNavigation');
     const slider = document.getElementById('sliceSlider');
     const total = document.getElementById('totalSlices');
-    if (currentSeries.length > 1) {
+
+    if (currentSeriesImages.length > 1) {
       nav.classList.remove('hidden');
-      slider.max = currentSeries.length - 1;
+      slider.max = currentSeriesImages.length - 1;
       slider.value = currentSliceIndex;
-      total.textContent = currentSeries.length;
+      total.textContent = currentSeriesImages.length;
     } else {
       nav.classList.add('hidden');
     }
@@ -367,8 +523,11 @@
     document.getElementById('seriesDescription').textContent = image.data?.string('x0008103e') || 'Unknown';
   }
 
+  function nextSlice(){ if (currentSliceIndex < currentSeriesImages.length - 1) displaySlice(currentSliceIndex + 1); }
+  function previousSlice(){ if (currentSliceIndex > 0) displaySlice(currentSliceIndex - 1); }
+
   // ---------------------
-  // Viewport & tools handling
+  // Viewport info update
   // ---------------------
   function onImageRendered() {
     try {
@@ -376,41 +535,43 @@
       document.getElementById('windowWidth').textContent = Math.round(vp.voi.windowWidth || 0);
       document.getElementById('windowLevel').textContent = Math.round(vp.voi.windowCenter || 0);
       document.getElementById('zoomLevel').textContent = Math.round((vp.scale || 1) * 100) + '%';
-    } catch(e){}
+    } catch (e) {}
   }
 
   function onNewImage() { safeSetWheelToolForSeries(); }
 
+  // ---------------------
+  // Set tool from toolbar
+  // ---------------------
   function setTool(toolName) {
     try {
       ['Wwwc','Zoom','Pan'].forEach(t => { try { cornerstoneTools.setToolPassive(t); } catch(e){} });
       cornerstoneTools.setToolActive(toolName, { mouseButtonMask: 1 });
-      if (currentSeries.length > 1) {
-        cornerstoneTools.setToolActive('StackScrollMouseWheel', {});
-      } else {
-        cornerstoneTools.setToolActive('ZoomMouseWheel', {});
-      }
+      if (currentSeriesImages.length > 1) cornerstoneTools.setToolActive('StackScrollMouseWheel', {});
+      else cornerstoneTools.setToolActive('ZoomMouseWheel', {});
       document.querySelectorAll('.tool-btn').forEach(b => b.classList.remove('active'));
-      const el = document.getElementById(toolName.toLowerCase() + 'Tool');
-      if (el) el.classList.add('active');
+      const elBtn = document.getElementById(toolName.toLowerCase() + 'Tool');
+      if (elBtn) elBtn.classList.add('active');
       element.focus();
-    } catch(e){ console.error('setTool error', e); }
+    } catch (e) {
+      console.error('setTool error', e);
+    }
   }
 
   // ---------------------
   // Transform controls
   // ---------------------
   function resetViewport() {
-    if (!currentSeries.length) return;
-    const image = currentSeries[currentSliceIndex];
-    const vp = cornerstone.getDefaultViewportForImage(element, image);
+    if (!currentSeriesImages.length) return;
+    const img = currentSeriesImages[currentSliceIndex];
+    const vp = cornerstone.getDefaultViewportForImage(element, img);
     cornerstone.setViewport(element, vp);
   }
-  function fitToWindow() { cornerstone.fitToWindow(element); }
+  function fitToWindow() { try { cornerstone.fitToWindow(element); } catch(e){} }
   function rotateImage() { try { const vp = cornerstone.getViewport(element); vp.rotation = (vp.rotation||0) + 90; cornerstone.setViewport(element, vp); } catch(e){} }
-  function flipHorizontal() { try { const vp = cornerstone.getViewport(element); vp.hflip = !vp.hflip; cornerstone.setViewport(element, vp);} catch(e){} }
-  function flipVertical() { try { const vp = cornerstone.getViewport(element); vp.vflip = !vp.vflip; cornerstone.setViewport(element, vp);} catch(e){} }
-  function invertImage() { try { const vp = cornerstone.getViewport(element); vp.invert = !vp.invert; cornerstone.setViewport(element, vp);} catch(e){} }
+  function flipHorizontal() { try { const vp = cornerstone.getViewport(element); vp.hflip = !vp.hflip; cornerstone.setViewport(element, vp); } catch(e){} }
+  function flipVertical() { try { const vp = cornerstone.getViewport(element); vp.vflip = !vp.vflip; cornerstone.setViewport(element, vp); } catch(e){} }
+  function invertImage() { try { const vp = cornerstone.getViewport(element); vp.invert = !vp.invert; cornerstone.setViewport(element, vp); } catch(e){} }
 
   function applyPreset(name) {
     const presets = {
@@ -429,19 +590,10 @@
     } catch(e){}
   }
 
-  function loadSeries(i){ if (currentSeries.length) displaySlice(i||0); }
-
   // ---------------------
-  // Slice navigation
+  // Helpers
   // ---------------------
-  function nextSlice(){ if (currentSliceIndex < currentSeries.length-1) displaySlice(currentSliceIndex+1); }
-  function previousSlice(){ if (currentSliceIndex > 0) displaySlice(currentSliceIndex-1); }
-
-  // ---------------------
-  // UI small helpers
-  // ---------------------
-  function showLoading(show){ const l = document.getElementById('loading'); l.classList.toggle('hidden', !show); }
-  function handleFileSelect(e){ const files = Array.from(e.target.files||[]); if (files.length) loadDicomFiles(files); }
+  function showLoading(show) { const l = document.getElementById('loading'); l.classList.toggle('hidden', !show); }
 
   // ---------------------
   // Init
@@ -452,7 +604,7 @@
     console.log('cornerstoneTools.globalConfiguration', window.cornerstoneTools && window.cornerstoneTools.globalConfiguration);
   });
 
-  // Expose some functions to global scope (UI uses global function names)
+  // Expose some globals used by inline attributes
   window.setTool = setTool;
   window.resetViewport = resetViewport;
   window.fitToWindow = fitToWindow;
@@ -463,136 +615,111 @@
   window.applyPreset = applyPreset;
   window.previousSlice = previousSlice;
   window.nextSlice = nextSlice;
-  window.loadSeries = loadSeries;
-  window.handleFileSelect = handleFileSelect;
+  window.loadSeries = selectSeries;
+  window.handleFileSelect = (e) => { const files = Array.from(e.target.files||[]); if(files.length) ingestFiles(files); };
 
+  // ---------------------
+  // Manual fallback interactions (same as before) — optional but kept for reliability
+  // ---------------------
+  (function installFallback() {
+    const el = document.getElementById('dicomElement'); if (!el) return;
 
+    if (!window.currentSeriesImages) window.currentSeriesImages = currentSeriesImages;
+    if (typeof nextSlice === 'function' && !window.nextSlice) window.nextSlice = nextSlice;
+    if (typeof previousSlice === 'function' && !window.previousSlice) window.previousSlice = previousSlice;
 
+    // Sensitivity params (tune these)
+    let PAN_MULTIPLIER = 0.45;
+    let ZOOM_SENSITIVITY = 0.0035;
+    let WW_SENSITIVITY = 0.28;
 
-  // ---------- Manual fallback interactions (complete) ----------
-(function() {
-    // debugger
-  const el = document.getElementById('dicomElement');
-  if (!el) return;
+    let manualTool = 'Wwwc';
+    let dragging = false;
+    let start = { x:0, y:0 };
+    let startViewport = null;
 
-  // Use your existing currentSeries (if declared locally, expose it)
-  if (!window.currentSeries && typeof currentSeries !== 'undefined') {
-    window.currentSeries = currentSeries;
-  }
+    function getViewport(){ try { return cornerstone.getViewport(el); } catch(e) { return null; } }
+    function setViewport(vp){ try { cornerstone.setViewport(el,vp); } catch(e){} }
 
-  // If your nextSlice/previousSlice functions exist make sure they're on window
-  if (typeof nextSlice === 'function' && !window.nextSlice) window.nextSlice = nextSlice;
-  if (typeof previousSlice === 'function' && !window.previousSlice) window.previousSlice = previousSlice;
+    window.setActiveManualTool = function(name) { manualTool = name; console.log('Manual tool:', name); };
 
-  let manualTool = 'Wwwc'; // default tool
-  let dragging = false;
-  let start = { x: 0, y: 0 };
-  let startViewport = null;
+    el.addEventListener('mousedown', function(e){
+      if (e.button !== 0) return;
+      dragging = true;
+      start.x = e.clientX; start.y = e.clientY;
+      startViewport = getViewport();
+      el.style.cursor = manualTool === 'Pan' ? 'grabbing' : 'ns-resize';
+      e.preventDefault();
+    }, { passive:false });
 
-  function getViewport() {
-    try { return cornerstone.getViewport(el); } catch (e) { return null; }
-  }
-  function setViewport(vp) {
-    try { cornerstone.setViewport(el, vp); } catch (e) {}
-  }
+    window.addEventListener('mousemove', function(e){
+      if (!dragging || !startViewport) return;
+      const dx = e.clientX - start.x;
+      const dy = e.clientY - start.y;
+      const vp = Object.assign({}, startViewport);
 
-  window.setActiveManualTool = function(name) {
-    manualTool = name;
-    console.log('Manual tool set to', name);
-  };
+      if (manualTool === 'Zoom') {
+        const amount = -dy * ZOOM_SENSITIVITY;
+        const newScale = Math.max(0.02, (startViewport.scale || 1) * Math.exp(amount));
+        vp.scale = newScale;
+        setViewport(vp);
+      } else if (manualTool === 'Pan') {
+        vp.translation = vp.translation || {x:0,y:0};
+        vp.translation.x = (startViewport.translation?.x || 0) + dx * PAN_MULTIPLIER;
+        vp.translation.y = (startViewport.translation?.y || 0) + dy * PAN_MULTIPLIER;
+        setViewport(vp);
+      } else {
+        vp.voi = vp.voi || {};
+        const startW = startViewport.voi?.windowWidth ?? 400;
+        const startC = startViewport.voi?.windowCenter ?? 40;
+        vp.voi.windowWidth = Math.max(1, Math.round(startW + dx * WW_SENSITIVITY));
+        vp.voi.windowCenter = Math.round(startC + dy * WW_SENSITIVITY);
+        setViewport(vp);
+      }
 
-  // start drag (left mouse)
-  el.addEventListener('mousedown', function(e) {
-    if (e.button !== 0) return;
-    dragging = true;
-    start.x = e.clientX; start.y = e.clientY;
-    startViewport = getViewport();
-    el.style.cursor = manualTool === 'Pan' ? 'grabbing' : 'ns-resize';
-    e.preventDefault();
-  }, { passive: false });
+      e.preventDefault();
+    }, { passive:false });
 
-  // drag behavior
-  window.addEventListener('mousemove', function(e) {
-    if (!dragging || !startViewport) return;
-    const dx = e.clientX - start.x;
-    const dy = e.clientY - start.y;
-    const vp = Object.assign({}, startViewport);
+    window.addEventListener('mouseup', function(e){
+      if (dragging) { dragging = false; startViewport = null; el.style.cursor='default'; }
+    });
 
-    if (manualTool === 'Zoom') {
-      // vertical drag controls zoom
-      const factor = 1 + (-dy) / 300; // drag up -> zoom in
-      vp.scale = Math.max(0.05, (startViewport.scale || 1) * factor);
-      setViewport(vp);
-    } else if (manualTool === 'Pan') {
-      vp.translation = vp.translation || { x: 0, y: 0 };
-      vp.translation.x = (startViewport.translation?.x || 0) + dx;
-      vp.translation.y = (startViewport.translation?.y || 0) + dy;
-      setViewport(vp);
-    } else { // Wwwc
-      vp.voi = vp.voi || {};
-      const startW = startViewport.voi?.windowWidth ?? 400;
-      const startC = startViewport.voi?.windowCenter ?? 40;
-      vp.voi.windowWidth = Math.max(1, startW + dx);
-      vp.voi.windowCenter = startC + dy;
-      setViewport(vp);
-    }
+    el.addEventListener('wheel', function(e){
+      e.preventDefault();
+      const dir = Math.sign(e.deltaY);
+      const series = currentSeriesImages || [];
+      if (series.length > 1 && typeof window.nextSlice === 'function' && typeof window.previousSlice === 'function') {
+        if (dir > 0) window.nextSlice(); else window.previousSlice();
+        return;
+      }
+      const vp = getViewport(); if (!vp) return;
+      const scale = vp.scale || 1;
+      const newScale = Math.max(0.02, scale * (dir > 0 ? 0.9 : 1.1));
+      vp.scale = newScale; setViewport(vp);
+    }, { passive:false });
 
-    e.preventDefault();
-  }, { passive: false });
+    const originalSetTool = window.setTool;
+    window.setTool = function(toolName) {
+      try { if (typeof originalSetTool === 'function') originalSetTool(toolName); } catch(e){}
+      if (/Wwwc/i.test(toolName)) setActiveManualTool('Wwwc');
+      else if (/Zoom/i.test(toolName)) setActiveManualTool('Zoom');
+      else if (/Pan/i.test(toolName)) setActiveManualTool('Pan');
+      else setActiveManualTool(toolName);
+    };
 
-  // end drag
-  window.addEventListener('mouseup', function(e) {
-    if (dragging) {
-      dragging = false;
-      startViewport = null;
-      el.style.cursor = 'default';
-    }
-  });
+    // read initial active button
+    setTimeout(()=> {
+      const active = document.querySelector('.tool-btn.active');
+      if (active) {
+        const id = active.id || '';
+        if (id.toLowerCase().includes('wwwc')) setActiveManualTool('Wwwc');
+        if (id.toLowerCase().includes('zoom')) setActiveManualTool('Zoom');
+        if (id.toLowerCase().includes('pan')) setActiveManualTool('Pan');
+      }
+    },50);
 
-  // wheel: slices if multi-slice, else zoom
-  el.addEventListener('wheel', function(e) {
-    e.preventDefault();
-    const dir = Math.sign(e.deltaY);
-    const series = window.currentSeries || [];
-    if (series.length > 1 && typeof window.nextSlice === 'function' && typeof window.previousSlice === 'function') {
-      if (dir > 0) window.nextSlice();
-      else window.previousSlice();
-      return;
-    }
-    const vp = getViewport();
-    if (!vp) return;
-    const scale = vp.scale || 1;
-    const newScale = Math.max(0.05, scale * (dir > 0 ? 0.9 : 1.1));
-    vp.scale = newScale;
-    setViewport(vp);
-  }, { passive: false });
-
-  // Hook toolbar's setTool so toolbar buttons also control fallback
-  const originalSetTool = window.setTool;
-  window.setTool = function(toolName) {
-    try { if (typeof originalSetTool === 'function') originalSetTool(toolName); } catch (e) {}
-    // Map common names:
-    if (/Wwwc/i.test(toolName)) setActiveManualTool('Wwwc');
-    else if (/Zoom/i.test(toolName)) setActiveManualTool('Zoom');
-    else if (/Pan/i.test(toolName)) setActiveManualTool('Pan');
-    else setActiveManualTool(toolName);
-  };
-
-  // Ensure initial toolbar state -> fallback sync
-  // If your toolbar buttons are initialized already, find the active one:
-  setTimeout(() => {
-    // try reading any active UI button to set fallback
-    const active = document.querySelector('.tool-btn.active');
-    if (active) {
-      const id = active.id || '';
-      if (id.toLowerCase().includes('wwwc')) setActiveManualTool('Wwwc');
-      if (id.toLowerCase().includes('zoom')) setActiveManualTool('Zoom');
-      if (id.toLowerCase().includes('pan')) setActiveManualTool('Pan');
-    }
-  }, 50);
-
-  console.log('Manual fallback interaction installed.');
-})();
+    console.log('Fallback interactions installed');
+  })();
 
   </script>
 </body>
