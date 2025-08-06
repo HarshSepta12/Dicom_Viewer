@@ -3,6 +3,10 @@
   margin: 0;
   padding: 0;
 }
+#uploadArea.highlight {
+  border: 2px dashed #4caf50;
+  background-color: #f6fff6;
+}
 body {
   font-family: system-ui, Segoe UI, Roboto;
   background: #1e1e1e;
