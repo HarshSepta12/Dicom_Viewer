@@ -1,0 +1,599 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>DICOM Viewer - Fixed (Cornerstone)</title>
+
+  <!-- Libraries -->
+  <script src="https://unpkg.com/dicom-parser@1.8.6/dist/dicomParser.min.js"></script>
+  <script src="https://unpkg.com/cornerstone-core@2.6.1/dist/cornerstone.min.js"></script>
+  <script src="https://unpkg.com/cornerstone-math@0.1.9/dist/cornerstoneMath.min.js"></script>
+  <script src="https://unpkg.com/cornerstone-wado-image-loader@3.0.2/dist/cornerstoneWADOImageLoader.min.js"></script>
+  <script src="https://unpkg.com/cornerstone-tools@4.21.0/dist/cornerstoneTools.min.js"></script>
+
+  <!-- <<< Patch: ensure globalConfiguration exists right after cornerstoneTools loads >>> -->
+  <script>
+    (function ensureCornerstoneToolsConfig() {
+      if (window.cornerstoneTools) {
+        window.cornerstoneTools.globalConfiguration = window.cornerstoneTools.globalConfiguration || {};
+        window.cornerstoneTools.globalConfiguration.configuration = window.cornerstoneTools.globalConfiguration.configuration || {};
+        if (typeof window.cornerstoneTools.globalConfiguration.configuration.globalToolSyncEnabled === 'undefined') {
+          window.cornerstoneTools.globalConfiguration.configuration.globalToolSyncEnabled = false;
+        }
+        console.log('ensureCornerstoneToolsConfig: patched globalConfiguration');
+      } else {
+        console.warn('ensureCornerstoneToolsConfig: cornerstoneTools not loaded yet');
+      }
+    })();
+  </script>
+
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:system-ui,Segoe UI,Roboto; background:#1e1e1e;color:#fff;height:100vh;overflow:hidden}
+    .app-container{display:flex;flex-direction:column;height:100vh}
+    .header{background:#2d2d2d;border-bottom:1px solid #404040;padding:12px 24px;display:flex;align-items:center;justify-content:space-between}
+    .logo{font-size:20px;color:#5ACCE6;font-weight:700}
+    .header-controls{display:flex;gap:10px}
+    .btn{background:#404040;border:1px solid #555;color:#fff;padding:8px 12px;border-radius:4px;cursor:pointer}
+    .btn.primary{background:#5ACCE6;color:#000;border-color:#5ACCE6}
+    .main-layout{display:flex;flex:1;overflow:hidden}
+    .sidebar{width:280px;background:#252525;border-right:1px solid #404040;display:flex;flex-direction:column}
+    .sidebar-section{padding:16px;border-bottom:1px solid #404040}
+    .viewer-area{flex:1;display:flex;flex-direction:column;position:relative;background:#000}
+    .toolbar{background:#2d2d2d;border-bottom:1px solid #404040;padding:8px 12px;display:flex;gap:8px;align-items:center}
+    .tool-btn{background:transparent;border:1px solid #555;color:#ccc;padding:8px 10px;border-radius:4px;cursor:pointer}
+    .tool-btn.active{background:#5ACCE6;color:#000;border-color:#5ACCE6}
+    #dicomElement{width:100%;height:100%;background:#000;outline:none}
+    .viewport-overlay{position:absolute;top:12px;left:12px;background:rgba(0,0,0,0.7);padding:8px;border-radius:6px;font-family:monospace;z-index:10;pointer-events:none}
+    .ww-wl-controls{position:absolute;top:12px;right:12px;background:rgba(0,0,0,0.7);padding:8px;border-radius:6px;font-family:monospace;z-index:10}
+    .slice-navigation{position:absolute;bottom:20px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,0.7);padding:10px;border-radius:20px;z-index:10;display:flex;gap:8px;align-items:center}
+    .slice-slider{width:200px}
+    .upload-overlay{position:absolute;inset:0;background:rgba(0,0,0,0.9);display:flex;align-items:center;justify-content:center;z-index:1000}
+    .upload-area{border:2px dashed #5ACCE6;padding:40px;border-radius:12px;text-align:center;background:rgba(90,204,230,0.03);cursor:pointer}
+    .hidden{display:none!important}
+    .loading{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);z-index:1200;text-align:center}
+    .spinner{width:36px;height:36px;border:3px solid rgba(90,204,230,0.3);border-top:3px solid #5ACCE6;border-radius:50%;animation:spin 1s linear infinite;margin:0 auto 8px}
+    @keyframes spin{to{transform:rotate(360deg)}}
+  </style>
+</head>
+<body>
+  <div class="app-container">
+    <div class="header">
+      <div class="logo">📋 OHIF Viewer</div>
+      <div class="header-controls">
+        <button class="btn" onclick="resetViewport()">🔄 Reset</button>
+        <button class="btn" onclick="fitToWindow()">📐 Fit</button>
+        <button class="btn primary" onclick="document.getElementById('fileInput').click()">📁 Load DICOM</button>
+      </div>
+    </div>
+
+    <div class="main-layout">
+      <div class="sidebar">
+        <div class="sidebar-section">
+          <div class="sidebar-title">Studies</div>
+          <div id="studiesList"><div style="color:#666;padding:20px;text-align:center">No studies loaded</div></div>
+        </div>
+        <div class="sidebar-section">
+          <div class="sidebar-title">Series</div>
+          <div id="seriesList" class="series-list"><div style="color:#666;padding:20px;text-align:center">No series available</div></div>
+        </div>
+      </div>
+
+      <div class="viewer-area">
+        <div class="toolbar">
+          <div style="display:flex;gap:6px">
+            <button id="wwwcTool" class="tool-btn active" onclick="setTool('Wwwc')">🖼️ W/L</button>
+            <button id="zoomTool" class="tool-btn" onclick="setTool('Zoom')">🔍 Zoom</button>
+            <button id="panTool" class="tool-btn" onclick="setTool('Pan')">✋ Pan</button>
+          </div>
+          <div style="flex:1"></div>
+          <div style="display:flex;gap:6px">
+            <button class="tool-btn" onclick="rotateImage()">↻</button>
+            <button class="tool-btn" onclick="flipHorizontal()">↔️</button>
+            <button class="tool-btn" onclick="flipVertical()">↕️</button>
+            <button class="tool-btn" onclick="invertImage()">⚫⚪</button>
+          </div>
+        </div>
+
+        <div class="viewport-container" style="flex:1;position:relative">
+          <div id="dicomElement" tabindex="0"></div>
+
+          <div class="viewport-overlay">
+            Patient: <span id="patientName">-</span><br>
+            Study: <span id="studyDate">-</span><br>
+            Series: <span id="seriesDescription">-</span><br>
+            Zoom: <span id="zoomLevel">-</span>
+          </div>
+
+          <div class="ww-wl-controls">
+            <div>WW: <span id="windowWidth">-</span></div>
+            <div>WL: <span id="windowLevel">-</span></div>
+          </div>
+
+          <div class="slice-navigation hidden" id="sliceNavigation">
+            <button class="btn" onclick="previousSlice()">◀</button>
+            <input type="range" id="sliceSlider" class="slice-slider" min="0" max="0" value="0">
+            <button class="btn" onclick="nextSlice()">▶</button>
+            <div style="color:#ccc;font-family:monospace;margin-left:8px"><span id="currentSlice">1</span> / <span id="totalSlices">1</span></div>
+          </div>
+
+          <div class="loading hidden" id="loading">
+            <div class="spinner"></div>
+            <div>Loading DICOM...</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="upload-overlay" id="uploadOverlay">
+      <div class="upload-area" id="uploadArea">
+        <div style="font-size:40px">📁</div>
+        <div style="font-size:18px;margin-top:6px">Drop DICOM files here</div>
+        <div style="color:#999;margin-top:6px">or click to select files (.dcm, .dicom)</div>
+        <input type="file" id="fileInput" accept=".dcm,.dicom" multiple style="margin-top:12px">
+      </div>
+    </div>
+  </div>
+
+  <script>
+  // ---------------------
+  // State
+  // ---------------------
+  const element = document.getElementById('dicomElement');
+  let currentSeries = []; // array of image objects
+  let currentSliceIndex = 0;
+
+  // ---------------------
+  // Helpers: patch again if needed
+  // ---------------------
+  function ensureGlobalConfig() {
+    if (typeof cornerstoneTools !== 'undefined') {
+      cornerstoneTools.globalConfiguration = cornerstoneTools.globalConfiguration || {};
+      cornerstoneTools.globalConfiguration.configuration = cornerstoneTools.globalConfiguration.configuration || {};
+      if (typeof cornerstoneTools.globalConfiguration.configuration.globalToolSyncEnabled === 'undefined') {
+        cornerstoneTools.globalConfiguration.configuration.globalToolSyncEnabled = false;
+      }
+    }
+  }
+
+  // ---------------------
+  // Initialize Cornerstone & Tools
+  // ---------------------
+  function initializeCornerstone() {
+    try {
+      ensureGlobalConfig();
+
+      // Wire externals
+      cornerstoneWADOImageLoader.external.cornerstone = cornerstone;
+      cornerstoneWADOImageLoader.external.dicomParser = dicomParser;
+      cornerstoneTools.external.cornerstone = cornerstone;
+      cornerstoneTools.external.cornerstoneMath = cornerstoneMath;
+
+      // Enable element
+      cornerstone.enable(element);
+      element.tabIndex = 0;
+      element.style.outline = 'none';
+      element.addEventListener('mouseenter', () => element.focus());
+
+      // Init tools
+      cornerstoneTools.init({
+        mouseEnabled: true,
+        touchEnabled: true,
+        globalToolSyncEnabled: false,
+        showSVGCursors: true
+      });
+
+      // Add tools
+      const { WwwcTool, ZoomTool, PanTool, StackScrollMouseWheelTool, ZoomMouseWheelTool } = cornerstoneTools;
+      try { if (WwwcTool) cornerstoneTools.addTool(WwwcTool); } catch(e){console.warn(e)}
+      try { if (ZoomTool) cornerstoneTools.addTool(ZoomTool); } catch(e){console.warn(e)}
+      try { if (PanTool) cornerstoneTools.addTool(PanTool); } catch(e){console.warn(e)}
+      try { if (StackScrollMouseWheelTool) cornerstoneTools.addTool(StackScrollMouseWheelTool); } catch(e){console.warn(e)}
+      try {
+        if (ZoomMouseWheelTool) {
+          cornerstoneTools.addTool(ZoomMouseWheelTool, { configuration: { invert:false, preventZoomOutsideImage:false }});
+        }
+      } catch(e){console.warn(e)}
+
+      // Default active = WWWC (left drag)
+      safeSetActiveTool('Wwwc');
+
+      // Default wheel: zoom-wheel for single slice (will be adjusted after load)
+      try { cornerstoneTools.setToolActive('ZoomMouseWheel', {}); } catch(e){}
+
+      setupEventListeners();
+    } catch (err) {
+      console.error('initializeCornerstone error', err);
+      alert('Initialization error: ' + (err.message || err));
+    }
+  }
+
+  // ---------------------
+  // Tool helpers
+  // ---------------------
+  function safeSetActiveTool(toolName, options = { mouseButtonMask: 1 }) {
+    ['Wwwc','Zoom','Pan'].forEach(t => { try { if (t !== toolName) cornerstoneTools.setToolPassive(t); } catch(e){} });
+    try { cornerstoneTools.setToolActive(toolName, options); } catch(e) { try { cornerstoneTools.setToolActive(toolName + 'Tool', options); } catch(e2){} }
+    updateToolButtons(toolName);
+    element.focus();
+  }
+
+  function safeSetWheelToolForSeries() {
+    try {
+      if (currentSeries.length > 1) {
+        cornerstoneTools.setToolActive('StackScrollMouseWheel', {});
+      } else {
+        cornerstoneTools.setToolActive('ZoomMouseWheel', {});
+      }
+    } catch(e) {}
+  }
+
+  function updateToolButtons(activeTool) {
+    document.querySelectorAll('.tool-btn').forEach(b => b.classList.remove('active'));
+    const id = activeTool ? activeTool.toLowerCase() + 'Tool' : null;
+    if (id) {
+      const el = document.getElementById(id);
+      if (el) el.classList.add('active');
+    }
+  }
+
+  // ---------------------
+  // Event listeners & UI wiring
+  // ---------------------
+  function setupEventListeners() {
+    const fileInput = document.getElementById('fileInput');
+    const uploadArea = document.getElementById('uploadArea');
+    const sliceSlider = document.getElementById('sliceSlider');
+
+    fileInput.addEventListener('change', handleFileSelect);
+    uploadArea.addEventListener('click', () => fileInput.click());
+    uploadArea.addEventListener('dragover', (e)=>{ e.preventDefault(); uploadArea.classList.add('dragover'); });
+    uploadArea.addEventListener('dragleave', (e)=>{ uploadArea.classList.remove('dragover'); });
+    uploadArea.addEventListener('drop', (e)=>{ e.preventDefault(); uploadArea.classList.remove('dragover'); const files = Array.from(e.dataTransfer.files||[]); if(files.length) loadDicomFiles(files); });
+
+    sliceSlider.addEventListener('input', (e) => displaySlice(parseInt(e.target.value,10)));
+
+    element.addEventListener('cornerstoneimagerendered', onImageRendered);
+    element.addEventListener('cornerstonenewimage', onNewImage);
+
+    document.addEventListener('keydown', (e) => {
+      if (!currentSeries.length) return;
+      if (e.key === 'ArrowRight' || e.key === 'ArrowUp') { e.preventDefault(); nextSlice(); }
+      if (e.key === 'ArrowLeft' || e.key === 'ArrowDown') { e.preventDefault(); previousSlice(); }
+    });
+  }
+
+  // ---------------------
+  // Load / display functions
+  // ---------------------
+  function loadDicomFiles(files) {
+    showLoading(true);
+    document.getElementById('uploadOverlay').classList.add('hidden');
+
+    const dicomFiles = Array.from(files).filter(f => /\.(dcm|dicom)$/i.test(f.name));
+    if (!dicomFiles.length) {
+      showLoading(false);
+      alert('Please select .dcm or .dicom files');
+      document.getElementById('uploadOverlay').classList.remove('hidden');
+      return;
+    }
+
+    const promises = dicomFiles.map(file => {
+      const imageId = cornerstoneWADOImageLoader.wadouri.fileManager.add(file);
+      return cornerstone.loadImage(imageId).then(img => ({ imageId, image: img, file }));
+    });
+
+    Promise.all(promises).then(results => {
+      // sort by InstanceNumber (0020,0013) then fallback to SliceLocation
+      results.sort((a,b) => {
+        try {
+          const ai = parseFloat(a.image.data.string('x00200013') || '0');
+          const bi = parseFloat(b.image.data.string('x00200013') || '0');
+          if (!isNaN(ai) && !isNaN(bi)) return ai - bi;
+        } catch(e){}
+        try {
+          const al = parseFloat(a.image.data.string('x00201041') || '0');
+          const bl = parseFloat(b.image.data.string('x00201041') || '0');
+          if (!isNaN(al) && !isNaN(bl)) return al - bl;
+        } catch(e){}
+        return 0;
+      });
+
+      currentSeries = results.map(r => r.image);
+      currentSliceIndex = 0;
+
+      updateStudiesList(currentSeries[0]);
+      updateSeriesList(results);
+      setupSliceNavigation();
+      displaySlice(0);
+
+      safeSetWheelToolForSeries();
+      showLoading(false);
+    }).catch(err => {
+      showLoading(false);
+      console.error('load error', err);
+      alert('Error loading files: ' + (err.message || err));
+    });
+  }
+
+  function displaySlice(index) {
+    if (!currentSeries.length || index < 0 || index >= currentSeries.length) return;
+    currentSliceIndex = index;
+    const image = currentSeries[index];
+    cornerstone.displayImage(element, image);
+    // UI updates
+    document.getElementById('currentSlice').textContent = index + 1;
+    document.getElementById('sliceSlider').value = index;
+    updatePatientInfo(image);
+    element.focus();
+  }
+
+  // ---------------------
+  // UI update helpers
+  // ---------------------
+  function updateStudiesList(img) {
+    const studiesList = document.getElementById('studiesList');
+    const patientName = img.data?.string('x00100010') || 'Unknown';
+    const studyDate = img.data?.string('x00080020') || 'Unknown';
+    const studyDesc = img.data?.string('x00081030') || 'Study';
+    studiesList.innerHTML = `<div style="padding:8px"><strong>${patientName}</strong><div style="color:#999">${studyDate}</div><div style="color:#999">${studyDesc}</div></div>`;
+  }
+
+  function updateSeriesList(results) {
+    const seriesList = document.getElementById('seriesList');
+    const seriesDesc = results[0].image.data?.string('x0008103e') || 'Series';
+    const seriesNumber = results[0].image.data?.string('x00200011') || '1';
+    seriesList.innerHTML = `<div class="series-item active" onclick="loadSeries(0)"><div style="font-weight:600">Series ${seriesNumber}</div><div style="color:#999">${seriesDesc}</div><div style="color:#666">${results.length} images</div></div>`;
+  }
+
+  function setupSliceNavigation() {
+    const nav = document.getElementById('sliceNavigation');
+    const slider = document.getElementById('sliceSlider');
+    const total = document.getElementById('totalSlices');
+    if (currentSeries.length > 1) {
+      nav.classList.remove('hidden');
+      slider.max = currentSeries.length - 1;
+      slider.value = currentSliceIndex;
+      total.textContent = currentSeries.length;
+    } else {
+      nav.classList.add('hidden');
+    }
+  }
+
+  function updatePatientInfo(image) {
+    document.getElementById('patientName').textContent = image.data?.string('x00100010') || 'Unknown';
+    document.getElementById('studyDate').textContent = image.data?.string('x00080020') || 'Unknown';
+    document.getElementById('seriesDescription').textContent = image.data?.string('x0008103e') || 'Unknown';
+  }
+
+  // ---------------------
+  // Viewport & tools handling
+  // ---------------------
+  function onImageRendered() {
+    try {
+      const vp = cornerstone.getViewport(element);
+      document.getElementById('windowWidth').textContent = Math.round(vp.voi.windowWidth || 0);
+      document.getElementById('windowLevel').textContent = Math.round(vp.voi.windowCenter || 0);
+      document.getElementById('zoomLevel').textContent = Math.round((vp.scale || 1) * 100) + '%';
+    } catch(e){}
+  }
+
+  function onNewImage() { safeSetWheelToolForSeries(); }
+
+  function setTool(toolName) {
+    try {
+      ['Wwwc','Zoom','Pan'].forEach(t => { try { cornerstoneTools.setToolPassive(t); } catch(e){} });
+      cornerstoneTools.setToolActive(toolName, { mouseButtonMask: 1 });
+      if (currentSeries.length > 1) {
+        cornerstoneTools.setToolActive('StackScrollMouseWheel', {});
+      } else {
+        cornerstoneTools.setToolActive('ZoomMouseWheel', {});
+      }
+      document.querySelectorAll('.tool-btn').forEach(b => b.classList.remove('active'));
+      const el = document.getElementById(toolName.toLowerCase() + 'Tool');
+      if (el) el.classList.add('active');
+      element.focus();
+    } catch(e){ console.error('setTool error', e); }
+  }
+
+  // ---------------------
+  // Transform controls
+  // ---------------------
+  function resetViewport() {
+    if (!currentSeries.length) return;
+    const image = currentSeries[currentSliceIndex];
+    const vp = cornerstone.getDefaultViewportForImage(element, image);
+    cornerstone.setViewport(element, vp);
+  }
+  function fitToWindow() { cornerstone.fitToWindow(element); }
+  function rotateImage() { try { const vp = cornerstone.getViewport(element); vp.rotation = (vp.rotation||0) + 90; cornerstone.setViewport(element, vp); } catch(e){} }
+  function flipHorizontal() { try { const vp = cornerstone.getViewport(element); vp.hflip = !vp.hflip; cornerstone.setViewport(element, vp);} catch(e){} }
+  function flipVertical() { try { const vp = cornerstone.getViewport(element); vp.vflip = !vp.vflip; cornerstone.setViewport(element, vp);} catch(e){} }
+  function invertImage() { try { const vp = cornerstone.getViewport(element); vp.invert = !vp.invert; cornerstone.setViewport(element, vp);} catch(e){} }
+
+  function applyPreset(name) {
+    const presets = {
+      CT_BONE: { windowWidth:2000, windowCenter:300 },
+      CT_LUNG: { windowWidth:1500, windowCenter:-600 },
+      CT_SOFT_TISSUE: { windowWidth:400, windowCenter:40 },
+      CT_ABDOMEN: { windowWidth:350, windowCenter:50 }
+    };
+    const preset = presets[name];
+    if (!preset) return;
+    try {
+      const vp = cornerstone.getViewport(element);
+      vp.voi.windowWidth = preset.windowWidth;
+      vp.voi.windowCenter = preset.windowCenter;
+      cornerstone.setViewport(element, vp);
+    } catch(e){}
+  }
+
+  function loadSeries(i){ if (currentSeries.length) displaySlice(i||0); }
+
+  // ---------------------
+  // Slice navigation
+  // ---------------------
+  function nextSlice(){ if (currentSliceIndex < currentSeries.length-1) displaySlice(currentSliceIndex+1); }
+  function previousSlice(){ if (currentSliceIndex > 0) displaySlice(currentSliceIndex-1); }
+
+  // ---------------------
+  // UI small helpers
+  // ---------------------
+  function showLoading(show){ const l = document.getElementById('loading'); l.classList.toggle('hidden', !show); }
+  function handleFileSelect(e){ const files = Array.from(e.target.files||[]); if (files.length) loadDicomFiles(files); }
+
+  // ---------------------
+  // Init
+  // ---------------------
+  window.addEventListener('load', () => {
+    initializeCornerstone();
+    console.log('cornerstoneTools present?', !!window.cornerstoneTools);
+    console.log('cornerstoneTools.globalConfiguration', window.cornerstoneTools && window.cornerstoneTools.globalConfiguration);
+  });
+
+  // Expose some functions to global scope (UI uses global function names)
+  window.setTool = setTool;
+  window.resetViewport = resetViewport;
+  window.fitToWindow = fitToWindow;
+  window.rotateImage = rotateImage;
+  window.flipHorizontal = flipHorizontal;
+  window.flipVertical = flipVertical;
+  window.invertImage = invertImage;
+  window.applyPreset = applyPreset;
+  window.previousSlice = previousSlice;
+  window.nextSlice = nextSlice;
+  window.loadSeries = loadSeries;
+  window.handleFileSelect = handleFileSelect;
+
+
+
+
+  // ---------- Manual fallback interactions (complete) ----------
+(function() {
+    // debugger
+  const el = document.getElementById('dicomElement');
+  if (!el) return;
+
+  // Use your existing currentSeries (if declared locally, expose it)
+  if (!window.currentSeries && typeof currentSeries !== 'undefined') {
+    window.currentSeries = currentSeries;
+  }
+
+  // If your nextSlice/previousSlice functions exist make sure they're on window
+  if (typeof nextSlice === 'function' && !window.nextSlice) window.nextSlice = nextSlice;
+  if (typeof previousSlice === 'function' && !window.previousSlice) window.previousSlice = previousSlice;
+
+  let manualTool = 'Wwwc'; // default tool
+  let dragging = false;
+  let start = { x: 0, y: 0 };
+  let startViewport = null;
+
+  function getViewport() {
+    try { return cornerstone.getViewport(el); } catch (e) { return null; }
+  }
+  function setViewport(vp) {
+    try { cornerstone.setViewport(el, vp); } catch (e) {}
+  }
+
+  window.setActiveManualTool = function(name) {
+    manualTool = name;
+    console.log('Manual tool set to', name);
+  };
+
+  // start drag (left mouse)
+  el.addEventListener('mousedown', function(e) {
+    if (e.button !== 0) return;
+    dragging = true;
+    start.x = e.clientX; start.y = e.clientY;
+    startViewport = getViewport();
+    el.style.cursor = manualTool === 'Pan' ? 'grabbing' : 'ns-resize';
+    e.preventDefault();
+  }, { passive: false });
+
+  // drag behavior
+  window.addEventListener('mousemove', function(e) {
+    if (!dragging || !startViewport) return;
+    const dx = e.clientX - start.x;
+    const dy = e.clientY - start.y;
+    const vp = Object.assign({}, startViewport);
+
+    if (manualTool === 'Zoom') {
+      // vertical drag controls zoom
+      const factor = 1 + (-dy) / 300; // drag up -> zoom in
+      vp.scale = Math.max(0.05, (startViewport.scale || 1) * factor);
+      setViewport(vp);
+    } else if (manualTool === 'Pan') {
+      vp.translation = vp.translation || { x: 0, y: 0 };
+      vp.translation.x = (startViewport.translation?.x || 0) + dx;
+      vp.translation.y = (startViewport.translation?.y || 0) + dy;
+      setViewport(vp);
+    } else { // Wwwc
+      vp.voi = vp.voi || {};
+      const startW = startViewport.voi?.windowWidth ?? 400;
+      const startC = startViewport.voi?.windowCenter ?? 40;
+      vp.voi.windowWidth = Math.max(1, startW + dx);
+      vp.voi.windowCenter = startC + dy;
+      setViewport(vp);
+    }
+
+    e.preventDefault();
+  }, { passive: false });
+
+  // end drag
+  window.addEventListener('mouseup', function(e) {
+    if (dragging) {
+      dragging = false;
+      startViewport = null;
+      el.style.cursor = 'default';
+    }
+  });
+
+  // wheel: slices if multi-slice, else zoom
+  el.addEventListener('wheel', function(e) {
+    e.preventDefault();
+    const dir = Math.sign(e.deltaY);
+    const series = window.currentSeries || [];
+    if (series.length > 1 && typeof window.nextSlice === 'function' && typeof window.previousSlice === 'function') {
+      if (dir > 0) window.nextSlice();
+      else window.previousSlice();
+      return;
+    }
+    const vp = getViewport();
+    if (!vp) return;
+    const scale = vp.scale || 1;
+    const newScale = Math.max(0.05, scale * (dir > 0 ? 0.9 : 1.1));
+    vp.scale = newScale;
+    setViewport(vp);
+  }, { passive: false });
+
+  // Hook toolbar's setTool so toolbar buttons also control fallback
+  const originalSetTool = window.setTool;
+  window.setTool = function(toolName) {
+    try { if (typeof originalSetTool === 'function') originalSetTool(toolName); } catch (e) {}
+    // Map common names:
+    if (/Wwwc/i.test(toolName)) setActiveManualTool('Wwwc');
+    else if (/Zoom/i.test(toolName)) setActiveManualTool('Zoom');
+    else if (/Pan/i.test(toolName)) setActiveManualTool('Pan');
+    else setActiveManualTool(toolName);
+  };
+
+  // Ensure initial toolbar state -> fallback sync
+  // If your toolbar buttons are initialized already, find the active one:
+  setTimeout(() => {
+    // try reading any active UI button to set fallback
+    const active = document.querySelector('.tool-btn.active');
+    if (active) {
+      const id = active.id || '';
+      if (id.toLowerCase().includes('wwwc')) setActiveManualTool('Wwwc');
+      if (id.toLowerCase().includes('zoom')) setActiveManualTool('Zoom');
+      if (id.toLowerCase().includes('pan')) setActiveManualTool('Pan');
+    }
+  }, 50);
+
+  console.log('Manual fallback interaction installed.');
+})();
+
+  </script>
+</body>
+</html>
