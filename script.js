@@ -8,9 +8,12 @@ let currentSeriesUID = null;
 let currentSeriesImages = []; // currently displayed series images (cornerstone image objects)
 let currentSliceIndex = 0;
 
+
+
 // ---------------------
 // Helpers: ensure config
 // ---------------------
+
 
 function ensureGlobalConfig() {
   if (typeof cornerstoneTools !== 'undefined') {
@@ -25,6 +28,9 @@ console.log('cornerstoneTools globalConfiguration', cornerstoneTools && cornerst
 // ---------------------
 // New helpers: DICOM extension check and DataTransfer traversal
 // ---------------------
+
+// Check if file is a DICOM file based on extension
+
 function isAllowedDicomFile(fileName) {
   return /\.(dcm|dicom)$/i.test(fileName || '');
 }
@@ -284,6 +290,8 @@ async function ingestFiles(fileList) {
   const fileInfos = fileList.map(file => {
     try {
       const imageId = cornerstoneWADOImageLoader.wadouri.fileManager.add(file);
+      //console.log(imageId, 'added for file', file.name);
+      
       return { file, imageId };
     } catch (e) {
       console.warn('fileManager.add failed', e);
@@ -359,6 +367,8 @@ function renderStudiesAndSeries() {
   const studiesListEl = document.getElementById('studiesList');
   const seriesListEl = document.getElementById('seriesList');
 
+  
+  
   // Studies listing (simple)
   const studyKeys = Object.keys(studies);
   if (!studyKeys.length) {
@@ -394,6 +404,8 @@ function onStudyClick(studyUID) {
 function renderSeriesForStudy(studyUID) {
   const seriesListEl = document.getElementById('seriesList');
   const st = studies[studyUID];
+ // console.log('Render series for study', studyUID, st);
+  
   if (!st) {
     seriesListEl.innerHTML = '<div class="small-muted">No series</div>';
     return;
@@ -613,9 +625,9 @@ window.handleFileSelect = (e) => { const files = Array.from(e.target.files||[]).
   if (typeof previousSlice === 'function' && !window.previousSlice) window.previousSlice = previousSlice;
 
   // Sensitivity params (tune these)
-  let PAN_MULTIPLIER = 0.10;
+  let PAN_MULTIPLIER = 0.010;
   let ZOOM_SENSITIVITY = 0.0035;
-  let WW_SENSITIVITY = 0.10;
+  let WW_SENSITIVITY = 0.010;
 
   let manualTool = 'Wwwc';
   let dragging = false;

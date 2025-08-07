@@ -174,7 +174,7 @@ body {
   border-radius: 12px;
   text-align: center;
   background: rgba(90, 204, 230, 0.03);
-  cursor: pointer;
+  /* cursor: pointer; */
   width: 700px;
 }
 .hidden {
@@ -215,6 +215,7 @@ body {
   border-radius: 4px;
   background: #2d2d2d;
   color: #fff;
+  cursor: pointer;
 }
 .file-inputs {
     display: flex !important;
@@ -224,6 +225,7 @@ body {
     align-items: center !important;
     margin-left: 5rem;
     width: 471px;
+    
 }
 .input-style-folder::-webkit-file-upload-button {
   visibility: hidden;
@@ -245,8 +247,6 @@ canvas{
   width: 100% !important;
   height: 100% !important;
   display: block !important;
-  /* background: #000 !important; */
 }
-/* input[type="file"] {
-  color: transparent;
-} */
+
+
