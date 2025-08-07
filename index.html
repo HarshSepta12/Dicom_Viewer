@@ -1,124 +1,192 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>DICOM Viewer — Series & Folder Upload</title>
-<link rel="stylesheet" href="style.css">
-  <!-- Libraries -->
-  <script src="https://unpkg.com/dicom-parser@1.8.6/dist/dicomParser.min.js"></script>
-  <script src="https://unpkg.com/cornerstone-core@2.6.1/dist/cornerstone.min.js"></script>
-  <script src="https://unpkg.com/cornerstone-math@0.1.9/dist/cornerstoneMath.min.js"></script>
-  <script src="https://unpkg.com/cornerstone-wado-image-loader@3.0.2/dist/cornerstoneWADOImageLoader.min.js"></script>
-  <script src="https://unpkg.com/cornerstone-tools@4.21.0/dist/cornerstoneTools.min.js"></script>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>DICOM Viewer — Series & Folder Upload</title>
+    <link rel="stylesheet" href="style.css" />
+    <!-- Libraries -->
+    <script src="https://unpkg.com/dicom-parser@1.8.6/dist/dicomParser.min.js"></script>
+    <script src="https://unpkg.com/cornerstone-core@2.6.1/dist/cornerstone.min.js"></script>
+    <script src="https://unpkg.com/cornerstone-math@0.1.9/dist/cornerstoneMath.min.js"></script>
+    <script src="https://unpkg.com/cornerstone-wado-image-loader@3.0.2/dist/cornerstoneWADOImageLoader.min.js"></script>
+    <script src="https://unpkg.com/cornerstone-tools@4.21.0/dist/cornerstoneTools.min.js"></script>
 
-  <!-- Ensure cornerstoneTools globalConfiguration exists -->
-  <script>
-    (function ensureCornerstoneToolsConfig() {
-      if (window.cornerstoneTools) {
-        window.cornerstoneTools.globalConfiguration = window.cornerstoneTools.globalConfiguration || {};
-        window.cornerstoneTools.globalConfiguration.configuration = window.cornerstoneTools.globalConfiguration.configuration || {};
-        if (typeof window.cornerstoneTools.globalConfiguration.configuration.globalToolSyncEnabled === 'undefined') {
-          window.cornerstoneTools.globalConfiguration.configuration.globalToolSyncEnabled = false;
+    <!-- Ensure cornerstoneTools globalConfiguration exists -->
+    <script>
+      (function ensureCornerstoneToolsConfig() {
+        if (window.cornerstoneTools) {
+          window.cornerstoneTools.globalConfiguration =
+            window.cornerstoneTools.globalConfiguration || {};
+          window.cornerstoneTools.globalConfiguration.configuration =
+            window.cornerstoneTools.globalConfiguration.configuration || {};
+          if (
+            typeof window.cornerstoneTools.globalConfiguration.configuration
+              .globalToolSyncEnabled === "undefined"
+          ) {
+            window.cornerstoneTools.globalConfiguration.configuration.globalToolSyncEnabled = false;
+          }
+          console.log("cornerstoneTools globalConfiguration patched");
+        } else {
+          console.warn("cornerstoneTools not loaded yet");
         }
-        console.log('cornerstoneTools globalConfiguration patched');
-      } else {
-        console.warn('cornerstoneTools not loaded yet');
-      }
-    })();
-  </script>
+      })();
+    </script>
+  </head>
+  <body>
+    <div class="app-container">
+      <div class="header">
+        <div class="logo">📋 OHIF Viewer (folder & series)</div>
+        <div class="header-controls">
+          <button class="btn" onclick="resetViewport()">🔄 Reset</button>
+          <button class="btn" onclick="fitToWindow()">📐 Fit</button>
+          <button
+            class="btn primary"
+            onclick="document.getElementById('fileInput').click()"
+          >
+            📁 Load DICOM Files
+          </button>
+        </div>
+      </div>
 
-  
-</head>
-<body>
-  <div class="app-container">
-    <div class="header">
-      <div class="logo">📋 OHIF-like Viewer (folder & series)</div>
-      <div class="header-controls">
-        <button class="btn" onclick="resetViewport()">🔄 Reset</button>
-        <button class="btn" onclick="fitToWindow()">📐 Fit</button>
-        <button class="btn primary" onclick="document.getElementById('fileInput').click()">📁 Load DICOM Files</button>
+      <div class="main-layout">
+        <div class="sidebar">
+          <div class="sidebar-section">
+            <div class="sidebar-title">Studies</div>
+            <div id="studiesList">
+              <div class="small-muted">No studies loaded</div>
+            </div>
+          </div>
+
+          <div class="sidebar-section">
+            <div class="sidebar-title">Series</div>
+            <div id="seriesList" class="series-list">
+              <div class="small-muted">No series available</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="viewer-area">
+          <div class="toolbar">
+            <div style="display: flex; gap: 6px">
+              <button
+                id="wwwcTool"
+                class="tool-btn active"
+                onclick="setTool('Wwwc')"
+              >
+                🖼️ W/L
+              </button>
+              <button id="zoomTool" class="tool-btn" onclick="setTool('Zoom')">
+                🔍 Zoom
+              </button>
+              <button id="panTool" class="tool-btn" onclick="setTool('Pan')">
+                ✋ Pan
+              </button>
+            </div>
+            <div style="flex: 1"></div>
+            <div style="display: flex; gap: 6px">
+              <button class="tool-btn" onclick="rotateImage()">↻</button>
+              <button class="tool-btn" onclick="flipHorizontal()">↔️</button>
+              <button class="tool-btn" onclick="flipVertical()">↕️</button>
+              <button class="tool-btn" onclick="invertImage()">⚫⚪</button>
+            </div>
+          </div>
+
+          <div
+            style="
+              flex: 1;
+              position: relative;
+              display: flex;
+              flex-direction: column;
+            "
+          >
+            <div id="dicomElement" tabindex="0"></div>
+
+            <div class="viewport-overlay">
+              Patient: <span id="patientName">-</span><br />
+              Study: <span id="studyDate">-</span><br />
+              Series: <span id="seriesDescription">-</span><br />
+              Zoom: <span id="zoomLevel">-</span>
+            </div>
+
+            <div class="ww-wl-controls">
+              <div>WW: <span id="windowWidth">-</span></div>
+              <div>WL: <span id="windowLevel">-</span></div>
+            </div>
+
+            <div class="slice-navigation hidden" id="sliceNavigation">
+              <button class="btn" onclick="previousSlice()">◀</button>
+              <input
+                type="range"
+                id="sliceSlider"
+                class="slice-slider"
+                min="0"
+                max="0"
+                value="0"
+              />
+              <button class="btn" onclick="nextSlice()">▶</button>
+              <div
+                style="color: #ccc; font-family: monospace; margin-left: 8px"
+              >
+                <span id="currentSlice">1</span> /
+                <span id="totalSlices">1</span>
+              </div>
+            </div>
+
+            <div class="loading hidden" id="loading">
+              <div class="spinner"></div>
+              <div>Loading DICOM...</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="upload-overlay" id="uploadOverlay">
+        <div class="upload-area" id="uploadArea">
+          <div style="font-size: 40px">📁</div>
+          <h1 style="font-size: 16px; margin-top: 6px">
+            Drag and Drop DICOM files here to load them in the Viewer
+          </h1>
+          <h4 style="color: #999; margin-top: 6px">
+            (Hint: you can drop an entire folder on this page)
+          </h4>
+          <div style="color: #999; margin-top: 6px">Or click to</div>
+
+          <div class="file-inputs">
+            <!-- Standard multiple file input -->
+            <button>
+              <input
+                type="file"
+                id="fileInput"
+                class="input-style input-style-file"
+                accept=".dcm,.dicom"
+                multiple
+              />
+            </button>
+            <!-- Directory picker (webkitdirectory) to allow folder selection in Chrome/Edge -->
+            <button>
+              <input
+                type="file"
+                id="folderInput"
+                class="input-style input-style-folder"
+                webkitdirectory
+                directory
+                multiple
+              />
+            </button>
+          </div>
+          <div class="small-muted">
+            Tip: press the Load DICOM Files button or drop files/folder here
+          </div>
+          <div class="small-muted">
+            No data is uploaded to any server. All processing happens locally
+            within this browser. Loading may take a few minutes when selecting
+            large studies.
+          </div>
+        </div>
       </div>
     </div>
 
-    <div class="main-layout">
-      <div class="sidebar">
-        <div class="sidebar-section">
-          <div class="sidebar-title">Studies</div>
-          <div id="studiesList"><div class="small-muted">No studies loaded</div></div>
-        </div>
-
-        <div class="sidebar-section">
-          <div class="sidebar-title">Series</div>
-          <div id="seriesList" class="series-list"><div class="small-muted">No series available</div></div>
-        </div>
-      </div>
-
-      <div class="viewer-area">
-        <div class="toolbar">
-          <div style="display:flex;gap:6px">
-            <button id="wwwcTool" class="tool-btn active" onclick="setTool('Wwwc')">🖼️ W/L</button>
-            <button id="zoomTool" class="tool-btn" onclick="setTool('Zoom')">🔍 Zoom</button>
-            <button id="panTool" class="tool-btn" onclick="setTool('Pan')">✋ Pan</button>
-          </div>
-          <div style="flex:1"></div>
-          <div style="display:flex;gap:6px">
-            <button class="tool-btn" onclick="rotateImage()">↻</button>
-            <button class="tool-btn" onclick="flipHorizontal()">↔️</button>
-            <button class="tool-btn" onclick="flipVertical()">↕️</button>
-            <button class="tool-btn" onclick="invertImage()">⚫⚪</button>
-          </div>
-        </div>
-
-        <div style="flex:1;position:relative;display:flex;flex-direction:column">
-          <div id="dicomElement" tabindex="0"></div>
-
-          <div class="viewport-overlay">
-            Patient: <span id="patientName">-</span><br>
-            Study: <span id="studyDate">-</span><br>
-            Series: <span id="seriesDescription">-</span><br>
-            Zoom: <span id="zoomLevel">-</span>
-          </div>
-
-          <div class="ww-wl-controls">
-            <div>WW: <span id="windowWidth">-</span></div>
-            <div>WL: <span id="windowLevel">-</span></div>
-          </div>
-
-          <div class="slice-navigation hidden" id="sliceNavigation">
-            <button class="btn" onclick="previousSlice()">◀</button>
-            <input type="range" id="sliceSlider" class="slice-slider" min="0" max="0" value="0">
-            <button class="btn" onclick="nextSlice()">▶</button>
-            <div style="color:#ccc;font-family:monospace;margin-left:8px"><span id="currentSlice">1</span> / <span id="totalSlices">1</span></div>
-          </div>
-
-          <div class="loading hidden" id="loading">
-            <div class="spinner"></div>
-            <div>Loading DICOM...</div>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <div class="upload-overlay" id="uploadOverlay">
-      <div class="upload-area" id="uploadArea">
-        <div style="font-size:40px">📁</div>
-        <div style="font-size:16px;margin-top:6px">Drag and Drop DICOM files here to load them in the Viewer</div>
-        <div style="color:#999;margin-top:6px">(Hint: you can drop an entire folder on this page)</div>
-        <div style="color:#999;margin-top:6px">Or click to</div>
-
-        <div class="file-inputs">
-          <!-- Standard multiple file input -->
-          <input type="file" id="fileInput" accept=".dcm,.dicom" multiple>
-          <!-- Directory picker (webkitdirectory) to allow folder selection in Chrome/Edge -->
-          <label class="small-muted">(Optional) Select folder: <input type="file" id="folderInput" webkitdirectory directory multiple style="display:inline-block;margin-left:8px"></label>
-          <div class="small-muted">Tip: press the Load DICOM Files button or drop files/folder here</div>
-        </div>
-      </div>
-    </div>
-  </div>
-
- <script src="script.js"></script>
- 
-</body>
+    <script src="script.js"></script>
+  </body>
 </html>

@@ -175,6 +175,7 @@ body {
   text-align: center;
   background: rgba(90, 204, 230, 0.03);
   cursor: pointer;
+  width: 700px;
 }
 .hidden {
   display: none !important;
@@ -204,14 +205,48 @@ body {
 .small-muted {
   color: #999;
   font-size: 12px;
+  margin-top: 1rem;
+}
+
+.input-style {
+  width: 100%;
+  padding: 8px;
+  border: 1px solid #555;
+  border-radius: 4px;
+  background: #2d2d2d;
+  color: #fff;
 }
 .file-inputs {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  margin-top: 12px;
-  align-items: center;
+    display: flex !important;
+    justify-content: space-between !important;
+    gap: 132px !important;
+    margin-top: 14px !important;
+    align-items: center !important;
+    margin-left: 5rem;
+    width: 471px;
 }
-input[type="file"] {
+.input-style-folder::-webkit-file-upload-button {
+  visibility: hidden;
+}
+
+.input-style-folder::before {
+  content: "Choose Folder";
+}
+
+.input-style-file::-webkit-file-upload-button {
+  visibility: hidden;
+}
+
+.input-style-file::before {
+  content: "Choose File";
+}
+
+canvas{
+  width: 100% !important;
+  height: 100% !important;
+  display: block !important;
+  /* background: #000 !important; */
+}
+/* input[type="file"] {
   color: transparent;
-}
+} */

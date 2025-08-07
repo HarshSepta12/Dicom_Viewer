@@ -11,6 +11,7 @@ let currentSliceIndex = 0;
 // ---------------------
 // Helpers: ensure config
 // ---------------------
+
 function ensureGlobalConfig() {
   if (typeof cornerstoneTools !== 'undefined') {
     cornerstoneTools.globalConfiguration = cornerstoneTools.globalConfiguration || {};
@@ -20,7 +21,7 @@ function ensureGlobalConfig() {
     }
   }
 }
-
+console.log('cornerstoneTools globalConfiguration', cornerstoneTools && cornerstoneTools.globalConfiguration);
 // ---------------------
 // New helpers: DICOM extension check and DataTransfer traversal
 // ---------------------
@@ -269,6 +270,7 @@ function setupEventListeners() {
   });
 }
 
+
 // ---------------------
 // Ingest files: parse DICOM metadata, group by Study/Series
 // (unchanged from your original logic)
@@ -321,6 +323,7 @@ async function ingestFiles(fileList) {
 
   // Group into studies -> series
   infos.forEach(info => {
+   // console.log('Parsed DICOM info:', info);
     const sUID = info.studyUID;
     const seUID = info.seriesUID;
     if (!studies[sUID]) {
@@ -610,9 +613,9 @@ window.handleFileSelect = (e) => { const files = Array.from(e.target.files||[]).
   if (typeof previousSlice === 'function' && !window.previousSlice) window.previousSlice = previousSlice;
 
   // Sensitivity params (tune these)
-  let PAN_MULTIPLIER = 0.45;
+  let PAN_MULTIPLIER = 0.10;
   let ZOOM_SENSITIVITY = 0.0035;
-  let WW_SENSITIVITY = 0.28;
+  let WW_SENSITIVITY = 0.10;
 
   let manualTool = 'Wwwc';
   let dragging = false;
