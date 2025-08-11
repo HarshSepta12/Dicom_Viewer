@@ -7,6 +7,15 @@
   border: 2px dashed #4caf50;
   background-color: #f6fff6;
 }
+
+.material-symbols-outlined {
+  font-variation-settings:
+  'FILL' 0,
+  'wght' 400,
+  'GRAD' 0,
+  'opsz' 24
+}
+
 body {
   font-family: system-ui, Segoe UI, Roboto;
   background: #1e1e1e;
@@ -88,8 +97,8 @@ body {
   border-color: #5acce6;
 }
 .viewer-area {
-  flex: 1;
   display: flex;
+  flex: 1;
   flex-direction: column;
   position: relative;
   background: #000;
@@ -250,3 +259,14 @@ canvas{
 }
 
 
+.measurement-info {
+  position: absolute;
+  bottom: 20px;
+  right: 20px;
+  background: rgba(0, 0, 0, 0.7);
+  color: white;
+  padding: 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  max-width: 200px;
+}

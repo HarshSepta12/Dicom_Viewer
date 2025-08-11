@@ -14,7 +14,6 @@ let currentSliceIndex = 0;
 // Helpers: ensure config
 // ---------------------
 
-
 function ensureGlobalConfig() {
   if (typeof cornerstoneTools !== 'undefined') {
     cornerstoneTools.globalConfiguration = cornerstoneTools.globalConfiguration || {};
@@ -24,7 +23,7 @@ function ensureGlobalConfig() {
     }
   }
 }
-console.log('cornerstoneTools globalConfiguration', cornerstoneTools && cornerstoneTools.globalConfiguration);
+// console.log('cornerstoneTools globalConfiguration', cornerstoneTools && cornerstoneTools.globalConfiguration);
 // ---------------------
 // New helpers: DICOM extension check and DataTransfer traversal
 // ---------------------
@@ -136,6 +135,8 @@ function initializeCornerstone() {
     cornerstoneTools.external.cornerstone = cornerstone;
     cornerstoneTools.external.cornerstoneMath = cornerstoneMath;
 
+    // console.log(cornerstoneTools )
+    
     // Enable element
     cornerstone.enable(element);
     element.tabIndex = 0;
@@ -151,12 +152,25 @@ function initializeCornerstone() {
     });
 
     // Add core tools
-    const { WwwcTool, ZoomTool, PanTool, StackScrollMouseWheelTool, ZoomMouseWheelTool } = cornerstoneTools;
-    try { if (WwwcTool) cornerstoneTools.addTool(WwwcTool); } catch(e){console.warn(e)}
-    try { if (ZoomTool) cornerstoneTools.addTool(ZoomTool); } catch(e){console.warn(e)}
-    try { if (PanTool) cornerstoneTools.addTool(PanTool); } catch(e){console.warn(e)}
-    try { if (StackScrollMouseWheelTool) cornerstoneTools.addTool(StackScrollMouseWheelTool); } catch(e){console.warn(e)}
-    try { if (ZoomMouseWheelTool) cornerstoneTools.addTool(ZoomMouseWheelTool, { configuration:{invert:false, preventZoomOutsideImage:false} }); } catch(e){}
+
+const { WwwcTool, ZoomTool, PanTool, StackScrollMouseWheelTool, ZoomMouseWheelTool, CircleRoiTool } = cornerstoneTools;
+try { if (WwwcTool) cornerstoneTools.addTool(WwwcTool); } catch(e){console.warn(e)}
+try { if (ZoomTool) cornerstoneTools.addTool(ZoomTool); } catch(e){console.warn(e)}
+try { if (PanTool) cornerstoneTools.addTool(PanTool); } catch(e){console.warn(e)}
+try { if (StackScrollMouseWheelTool) cornerstoneTools.addTool(StackScrollMouseWheelTool); } catch(e){console.warn(e)}
+try { if (ZoomMouseWheelTool) cornerstoneTools.addTool(ZoomMouseWheelTool, { configuration:{invert:false, preventZoomOutsideImage:false} }); } catch(e){}
+try { 
+  if (CircleRoiTool) {
+    cornerstoneTools.addTool(CircleRoiTool, {
+      configuration: {
+        getMeasurementLocationCallback: (points) => {
+          return `Center: (${Math.round(points[0][0])}, ${Math.round(points[0][1])})`;
+        }
+      }
+    });
+  }
+} catch(e){console.warn(e)}
+
 
     safeSetActiveTool('Wwwc');
     try { cornerstoneTools.setToolActive('ZoomMouseWheel', {}); } catch(e){}
@@ -193,6 +207,8 @@ function updateToolButtons(activeTool) {
   }
 }
 
+
+
 // ---------------------
 // Event listeners & file input wiring
 // ---------------------
@@ -211,7 +227,7 @@ function setupEventListeners() {
       alert(`${invalidCount} non-DICOM file(s) were ignored. Only .dcm / .dicom files will be loaded.`);
     }
     if (files.length) ingestFiles(files);
-    e.target.value = '';
+    e.target.value = '';  // reset input value to allow re-selecting same files
   });
 
   // Folder selection (webkitdirectory) - files will often have webkitRelativePath
@@ -539,12 +555,19 @@ function onNewImage() { safeSetWheelToolForSeries(); }
 // ---------------------
 // Set tool from toolbar
 // ---------------------
+
 function setTool(toolName) {
+  debugger
   try {
-    ['Wwwc','Zoom','Pan'].forEach(t => { try { cornerstoneTools.setToolPassive(t); } catch(e){} });
+    ['Wwwc', 'Zoom', 'Pan', 'CircleRoi'].forEach(t => { 
+      try { cornerstoneTools.setToolPassive(t); } catch(e){}
+    });
     cornerstoneTools.setToolActive(toolName, { mouseButtonMask: 1 });
-    if (currentSeriesImages.length > 1) cornerstoneTools.setToolActive('StackScrollMouseWheel', {});
-    else cornerstoneTools.setToolActive('ZoomMouseWheel', {});
+    if (currentSeriesImages.length > 1) {
+      cornerstoneTools.setToolActive('StackScrollMouseWheel', {});
+    } else {
+      cornerstoneTools.setToolActive('ZoomMouseWheel', {});
+    }
     document.querySelectorAll('.tool-btn').forEach(b => b.classList.remove('active'));
     const elBtn = document.getElementById(toolName.toLowerCase() + 'Tool');
     if (elBtn) elBtn.classList.add('active');
@@ -563,6 +586,7 @@ function resetViewport() {
   const vp = cornerstone.getDefaultViewportForImage(element, img);
   cornerstone.setViewport(element, vp);
 }
+
 function fitToWindow() { try { cornerstone.fitToWindow(element); } catch(e){} }
 function rotateImage() { try { const vp = cornerstone.getViewport(element); vp.rotation = (vp.rotation||0) + 90; cornerstone.setViewport(element, vp); } catch(e){} }
 function flipHorizontal() { try { const vp = cornerstone.getViewport(element); vp.hflip = !vp.hflip; cornerstone.setViewport(element, vp); } catch(e){} }
@@ -637,7 +661,9 @@ window.handleFileSelect = (e) => { const files = Array.from(e.target.files||[]).
   function getViewport(){ try { return cornerstone.getViewport(el); } catch(e) { return null; } }
   function setViewport(vp){ try { cornerstone.setViewport(el,vp); } catch(e){} }
 
-  window.setActiveManualTool = function(name) { manualTool = name; console.log('Manual tool:', name); };
+  window.setActiveManualTool = function(name) { manualTool = name; 
+    //console.log('Manual tool:', name);
+   };
 
   el.addEventListener('mousedown', function(e){
     if (e.button !== 0) return;
@@ -714,5 +740,53 @@ window.handleFileSelect = (e) => { const files = Array.from(e.target.files||[]).
     }
   },50);
 
-  console.log('Fallback interactions installed');
+  // console.log('Fallback interactions installed');
 })();
+
+
+function saveCurrentImage() {
+  if (!currentSeriesImages.length || currentSliceIndex < 0 || currentSliceIndex >= currentSeriesImages.length) {
+    alert('No image to save.');
+    return;
+  }
+  // Get the canvas from the enabled element
+  const enabledElement = cornerstone.getEnabledElement(element);
+  if (!enabledElement || !enabledElement.canvas) {
+    alert('No image canvas found.');
+    return;
+  }
+  const canvas = enabledElement.canvas;
+  const dataURL = canvas.toDataURL('image/png');
+  const link = document.createElement('a');
+  link.href = dataURL;
+  link.download = `dicom_image_${currentSliceIndex}.png`;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+}
+
+
+
+function handleMeasurementData(evt) {
+  const measurementData = evt.detail.measurementData;
+//  console.log('Circle ROI created:', measurementData);
+  // You can display this data in your UI or use it for analysis
+  displayMeasurement(measurementData);
+}
+
+function displayMeasurement(data) {
+ 
+  document.querySelectorAll('.measurement-info').forEach(el => el.remove());
+  const infoDiv = document.createElement('div');
+  infoDiv.className = 'measurement-info';
+  infoDiv.innerHTML = `
+    <strong>Circle ROI</strong><br>
+    Center: (${Math.round(data.handles.start.x)}, ${Math.round(data.handles.start.y)})<br>
+    Radius: ${Math.round(data.handles.end.x - data.handles.start.x)} pixels
+  `;
+  document.querySelector('.viewport-overlay').appendChild(infoDiv);
+}
+
+// Add event listener for measurement completed
+document.addEventListener('cornerstonetoolsmeasurementcompleted', handleMeasurementData);
+
