@@ -5,10 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>DICOM Viewer — Series & Folder Upload</title>
     <link rel="stylesheet" href="style.css" />
-    <link
-      rel="stylesheet"
-      href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&icon_names=animated_images"
-    />
+   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&icon_names=add_a_photo" />
     <!-- Libraries -->
     <script src="https://unpkg.com/dicom-parser@1.8.6/dist/dicomParser.min.js"></script>
     <script src="https://unpkg.com/cornerstone-core@2.6.1/dist/cornerstone.min.js"></script>
@@ -17,7 +14,7 @@
     <script src="https://unpkg.com/cornerstone-tools@4.21.0/dist/cornerstoneTools.min.js"></script>
 
     <!-- Ensure cornerstoneTools globalConfiguration exists -->
-    <script>
+    <!-- <script>
       (function ensureCornerstoneToolsConfig() {
         if (window.cornerstoneTools) {
           window.cornerstoneTools.globalConfiguration =
@@ -35,7 +32,7 @@
           console.warn("cornerstoneTools not loaded yet");
         }
       })();
-    </script>
+    </script> -->
   </head>
   <body>
     <div class="app-container">
@@ -72,12 +69,17 @@
 
         <div class="viewer-area">
           <div class="toolbar">
+            
            <div style="display: flex; gap: 6px">
-           <button id="wwwcTool" class="tool-btn active" onclick="setTool('Wwwc')">🖼️ W/L</button>
-           <button id="zoomTool" class="tool-btn" onclick="setTool('Zoom')">🔍 Zoom</button>
-           <button id="panTool" class="tool-btn" onclick="setTool('Pan')">✋ Pan</button>
-           <button id="circleroiTool" class="tool-btn" onclick="setTool('CircleRoi')">🔵 Circle ROI</button>
-           <button id="saveButton" onclick="saveCurrentImage()">Save Image</button>
+           <!-- Tool Buttons -->
+        <button id="wwwcTool" class="tool-btn active" onclick="setTool('Wwwc')">🖼️ W/L</button>
+        <button id="zoomTool" class="tool-btn" onclick="setTool('Zoom')">🔍 Zoom</button>
+        <button id="panTool" class="tool-btn" onclick="setTool('Pan')">✋ Pan</button>
+        <!-- <button id="circleroiTool" class="tool-btn" onclick="setTool('CircleRoi')">🔵 Circle ROI</button> -->
+        <button id="saveButton" onclick="saveCurrentImage()">
+        <span class="material-symbols-outlined">add_a_photo</span>
+        </button>
+
           </div>
 
             <div style="flex: 1"></div>
